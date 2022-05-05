@@ -53,14 +53,15 @@ st.sidebar.markdown("## Diffusion model parameters")
 #%%
 
 n_trials = 10
-t_dur = 5
+t_dur = 6
 
-bound = st.sidebar.slider("boundary [0, ∞]", 0.1, 1.4, step=0.1, value=0.5)
+bound_max = 1.1
+bound = st.sidebar.slider("boundary [0, ∞]", 0.1, bound_max, step=0.1, value=0.7)
 drift = st.sidebar.slider("drift [-∞, ∞]", -3.0, 3.0, step=0.2, value=0.0)
 ic = st.sidebar.slider(
     "start point or bias (0: no bias)", -bound + 0.05, bound - 0.05, step=0.1, value=0.0
 )
-ndt = st.sidebar.slider("non-decision time (ms)", 0.3, 1.0, step=0.2, value=0.3)
+ndt = st.sidebar.slider("non-decision time (ms)", 0.3, 1.5, step=0.2, value=0.3)
 
 xmin = 0
 xmax = t_dur
@@ -161,11 +162,11 @@ hlineU = (
 
 
 def plot(t=100000):
-    ylimit = bound
     # dat = df.copy().query("trial <= @t")
     t = str(t)
     dat = df.copy().query("trial == @t")
     if dat.shape[0] == 0:
+        print("No data for trial", t)
         return None
 
     if np.sign(dat.query("evidence.notna()")["evidence"].to_list()[-1]) == 1:
@@ -185,7 +186,7 @@ def plot(t=100000):
             ),
             y=alt.Y(
                 "evidence:Q",
-                scale=alt.Scale(domain=(-ylimit, ylimit)),
+                scale=alt.Scale(domain=(-bound_max, bound_max)),
                 axis=alt.Axis(grid=False),
             ),
             # color=alt.Color("trial", legend=None),
@@ -199,7 +200,10 @@ def plot(t=100000):
 
 simulate_button.empty()
 if plot(0) is not None:
-    chart = plot(0) + plot(1) + plot(2)
+    chart = plot(0)
+    for i in range(2):
+        if plot(i) is not None:
+            chart += plot(i + 1)
     fig_containers.altair_chart(chart, use_container_width=True)
 if simulate_button.button("Simulate more decisions", key="start"):
     chart = None
