@@ -56,12 +56,12 @@ n_trials = 10
 t_dur = 6
 
 bound_max = 1.1
-bound = st.sidebar.slider("boundary [0, ∞]", 0.1, bound_max, step=0.1, value=0.7)
+bound = st.sidebar.slider("boundary [0, ∞]", 0.2, bound_max, step=0.1, value=0.7)
 drift = st.sidebar.slider("drift [-∞, ∞]", -3.0, 3.0, step=0.2, value=0.0)
 ic = st.sidebar.slider(
-    "start point or bias (0: no bias)", -bound + 0.05, bound - 0.05, step=0.1, value=0.0
+    "start point or bias (0: no bias toward either bound)", -bound + 0.1, bound - 0.1, step=0.1, value=0.0
 )
-ndt = st.sidebar.slider("non-decision time (ms)", 0.3, 1.5, step=0.2, value=0.3)
+ndt = st.sidebar.slider("non-decision time (s) [0, ∞]", 0.3, 1.5, step=0.2, value=0.3)
 
 xmin = 0
 xmax = t_dur
@@ -119,7 +119,9 @@ dens_container.altair_chart(dens, use_container_width=True)
 #%%
 
 df = pd.DataFrame()
-for n in range(n_trials + 10000):
+n = 0
+while n < n_trials:
+    # for n in range(n_trials + 10000):
     x = model.simulate_trial(cutoff=False, seed=np.random.randint(0, 2**32))
     try:
         idx = np.where(np.abs(x) >= bound)[0][0]
@@ -129,9 +131,7 @@ for n in range(n_trials + 10000):
     x[x > bound] = bound
     x[x < -bound] = -bound
     df[n] = x
-    if df.shape[1] == n_trials:
-        break
-n_trials = df.shape[1]
+    n += 1
 # df
 
 
