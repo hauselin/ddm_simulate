@@ -55,10 +55,12 @@ st.sidebar.markdown("## Diffusion model parameters")
 n_trials = 10
 t_dur = 5
 
-bound = st.sidebar.slider("boundary", 0.5, 2.0, step=0.1, value=0.7)
-drift = st.sidebar.slider("drift", -0.8, 0.8, step=0.2, value=0.0)
-ic = st.sidebar.slider("start point (bias)", -0.4, 0.4, step=0.1, value=0.0)
-ndt = st.sidebar.slider("non-decision time", 0.3, 1.0, step=0.2, value=0.3)
+bound = st.sidebar.slider("boundary [0, ∞]", 0.1, 1.3, step=0.1, value=0.6)
+drift = st.sidebar.slider("drift [-∞, ∞]", -3.0, 3.0, step=0.2, value=0.0)
+ic = st.sidebar.slider(
+    "start point or bias (0: no bias)", -bound + 0.05, bound - 0.05, step=0.1, value=0.0
+)
+ndt = st.sidebar.slider("non-decision time (ms)", 0.3, 1.0, step=0.2, value=0.3)
 
 xmin = 0
 xmax = t_dur
@@ -75,11 +77,11 @@ model = Model(
     T_dur=t_dur,
 )
 sol = model.solve()
-samp = sol.resample(500)
+samp = sol.resample(2000)
 behav = samp.to_pandas_dataframe(drop_undecided=True)
 
-rt = behav.groupby("correct").mean().round(2).reset_index(drop=True)
-rt["proportion_trials"] = np.round(behav["correct"].value_counts() / behav.shape[0], 2)
+rt = behav.groupby("correct").mean().reset_index(drop=True)
+rt["proportion_trials"] = behav["correct"].value_counts() / behav.shape[0]
 rt = rt.sort_index(ascending=False)
 rt.index = ["upper_bound", "lower_bound"]
 rt = rt[["proportion_trials", "RT"]]
@@ -87,10 +89,11 @@ rt = rt[["proportion_trials", "RT"]]
 #%%
 
 st.markdown("##### Simulated behavior")
-st.dataframe(rt)
+st.table(rt)
 
-start_button = st.empty()
-figcontainer = st.empty()
+dens_container = st.empty()
+simulate_button = st.empty()
+fig_containers = st.empty()
 
 behav["bound"] = behav["correct"].replace({0: "lower", 1: "upper"})
 
@@ -100,15 +103,22 @@ dens = (
         density="RT", groupby=["bound"], as_=["RT", "density"], extent=[0, t_dur]
     )
     .mark_area()
-    .encode(alt.X("RT:Q"), alt.Y("density:Q"), alt.Color("bound:N"))
+    .encode(
+        alt.X("RT:Q", title="reaction time (s)"),
+        alt.Y("density:Q"),
+        alt.Color("bound:N", legend=None),
+        tooltip=["bound"],
+    )
 )
 # dens
-st.sidebar.altair_chart(dens, use_container_width=True)
+# st.sidebar.altair_chart(dens, use_container_width=True)
+dens_container.empty()
+dens_container.altair_chart(dens, use_container_width=True)
 
 #%%
 
 df = pd.DataFrame()
-for n in range(n_trials):
+for n in range(n_trials + 1000):
     x = model.simulate_trial(cutoff=False, seed=np.random.randint(0, 2**32))
     try:
         idx = np.where(np.abs(x) >= bound)[0][0]
@@ -118,6 +128,9 @@ for n in range(n_trials):
     x[x > bound] = bound
     x[x < -bound] = -bound
     df[n] = x
+    if df.shape[1] == n_trials:
+        break
+n_trials = df.shape[1]
 # df
 
 
@@ -153,21 +166,28 @@ def plot(t=100000):
     t = str(t)
     dat = df.copy().query("trial == @t")
 
+    if np.sign(dat.query("evidence.notna()")["evidence"].to_list()[-1]) == 1:
+        color = "#f58518"
+    else:
+        color = "#4c78a8"
+
     chart = (
         alt.Chart(dat)
-        .mark_line(size=2)
+        .mark_line(size=2, color=color)
         .encode(
             x=alt.X(
                 "time:Q",
                 scale=alt.Scale(domain=(xmin, xmax)),
                 axis=alt.Axis(grid=False),
+                title="time (s)",
             ),
             y=alt.Y(
                 "evidence:Q",
                 scale=alt.Scale(domain=(-ylimit, ylimit)),
                 axis=alt.Axis(grid=False),
             ),
-            color=alt.Color("trial", legend=None),
+            # color=alt.Color("trial", legend=None),
+            tooltip=["time", "evidence"],
         )
     )
     return chart + hline0 + hlineL + hlineU
@@ -175,11 +195,14 @@ def plot(t=100000):
 
 #%%
 
-start_button.empty()
-if start_button.button("Simulate trials", key="start"):
+simulate_button.empty()
+chart = plot(0) + plot(1) + plot(2)
+fig_containers.altair_chart(chart, use_container_width=True)
+if simulate_button.button("Simulate more decisions", key="start"):
+    chart = None
     for t in range(n_trials):
         chart = plot(t) if t == 0 else chart + plot(t)
-        figcontainer.altair_chart(chart, use_container_width=True)
+        fig_containers.altair_chart(chart, use_container_width=True)
         time.sleep(0.5)
 
 
