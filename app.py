@@ -55,7 +55,7 @@ st.sidebar.markdown("## Diffusion model parameters")
 n_trials = 10
 t_dur = 5
 
-bound = st.sidebar.slider("boundary [0, ∞]", 0.1, 1.3, step=0.1, value=0.6)
+bound = st.sidebar.slider("boundary [0, ∞]", 0.1, 1.4, step=0.1, value=0.5)
 drift = st.sidebar.slider("drift [-∞, ∞]", -3.0, 3.0, step=0.2, value=0.0)
 ic = st.sidebar.slider(
     "start point or bias (0: no bias)", -bound + 0.05, bound - 0.05, step=0.1, value=0.0
@@ -77,7 +77,7 @@ model = Model(
     T_dur=t_dur,
 )
 sol = model.solve()
-samp = sol.resample(2000)
+samp = sol.resample(5000)
 behav = samp.to_pandas_dataframe(drop_undecided=True)
 
 rt = behav.groupby("correct").mean().reset_index(drop=True)
@@ -118,7 +118,7 @@ dens_container.altair_chart(dens, use_container_width=True)
 #%%
 
 df = pd.DataFrame()
-for n in range(n_trials + 1000):
+for n in range(n_trials + 10000):
     x = model.simulate_trial(cutoff=False, seed=np.random.randint(0, 2**32))
     try:
         idx = np.where(np.abs(x) >= bound)[0][0]
@@ -165,6 +165,8 @@ def plot(t=100000):
     # dat = df.copy().query("trial <= @t")
     t = str(t)
     dat = df.copy().query("trial == @t")
+    if dat.shape[0] == 0:
+        return None
 
     if np.sign(dat.query("evidence.notna()")["evidence"].to_list()[-1]) == 1:
         color = "#f58518"
@@ -196,8 +198,9 @@ def plot(t=100000):
 #%%
 
 simulate_button.empty()
-chart = plot(0) + plot(1) + plot(2)
-fig_containers.altair_chart(chart, use_container_width=True)
+if plot(0) is not None:
+    chart = plot(0) + plot(1) + plot(2)
+    fig_containers.altair_chart(chart, use_container_width=True)
 if simulate_button.button("Simulate more decisions", key="start"):
     chart = None
     for t in range(n_trials):
