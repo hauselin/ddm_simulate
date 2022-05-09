@@ -59,7 +59,11 @@ bound_max = 1.1
 bound = st.sidebar.slider("boundary [0, ∞]", 0.2, bound_max, step=0.1, value=0.7)
 drift = st.sidebar.slider("drift [-∞, ∞]", -3.0, 3.0, step=0.2, value=0.0)
 ic = st.sidebar.slider(
-    "start point or bias (0: no bias toward either bound)", -bound + 0.1, bound - 0.1, step=0.1, value=0.0
+    "start point or bias (0: no bias toward either bound)",
+    -bound + 0.1,
+    bound - 0.1,
+    step=0.1,
+    value=0.0,
 )
 ndt = st.sidebar.slider("non-decision time (s) [0, ∞]", 0.3, 1.5, step=0.2, value=0.3)
 
@@ -86,6 +90,32 @@ rt["proportion_trials"] = behav["correct"].value_counts() / behav.shape[0]
 rt = rt.sort_index(ascending=False)
 rt.index = ["upper_bound", "lower_bound"]
 rt = rt[["proportion_trials", "RT"]]
+
+#%%
+
+st.sidebar.markdown("#### DDM stochastic differential equation")
+st.sidebar.latex(r"dX(t) = v \cdot dt + s \cdot dW(t)")
+st.sidebar.markdown(
+    """
+- $dX(t)$: change in evidence X
+- $v$: drift rate
+- $dt$: change in time (precision)
+- $s$: diffusion coefficient (usually 0.1)
+- $dW(t)$: noise with mean 0 and variance $s^2 \cdot dt$
+"""
+)
+
+#%%
+
+code = """from numpy import sqrt
+from numpy.random import normal
+
+dt = 0.001  # time step (1 ms)
+drift = 0.5
+s = 0.1  # diffusion coef
+evidence = drift * dt + normal(loc=0, scale=s * sqrt(dt))
+"""
+st.sidebar.code(code, language="python")
 
 #%%
 
